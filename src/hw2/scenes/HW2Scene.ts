@@ -166,6 +166,9 @@ export default class HW2Scene extends Scene {
 		this.receiver.subscribe(HW2Events.CHARGE_CHANGE);
 		this.receiver.subscribe(HW2Events.SHOOT_LASER);
 		this.receiver.subscribe(HW2Events.DEAD);
+		this.receiver.subscribe(HW2Events.DAMAGE);
+		this.receiver.subscribe(HW2Events.LOSE_AIR);
+		this.receiver.subscribe(HW2Events.BUBBLE_COLLISION);
 
 		// Subscribe to laser events
 		this.receiver.subscribe(HW2Events.FIRING_LASER);
@@ -232,6 +235,22 @@ export default class HW2Scene extends Scene {
 			}
 			case HW2Events.FIRING_LASER: {
 				this.minesDestroyed += this.handleMineLaserCollisions(event.data.get("laser"), this.mines);
+				break;
+			}
+			case HW2Events.PLAYER_MINE_COLLISION: {
+				this.minesDestroyed += this.handleMinePlayerCollisions();
+				break;
+			}
+			case HW2Events.DAMAGE: {
+				this.handleHealthChange(event.data.get("currentHealth"), event.data.get("maxHealth"));
+				break;
+			}
+			case HW2Events.LOSE_AIR: {
+				this.handleAirChange(event.data.get("currentAir"), event.data.get("maxAir"));
+				break;
+			}
+			case HW2Events.BUBBLE_COLLISION: {
+				this.bubblesPopped += this.handleBubblePlayerCollisions();
 				break;
 			}
 			default: {
@@ -538,6 +557,25 @@ export default class HW2Scene extends Scene {
 	 */
 	protected spawnBubble(): void {
 		// TODO spawn bubbles!
+		
+		// Find the first visible bubble 
+		let bubble: Graphic = this.bubbles.find((bubble: Graphic) => { return !bubble.visible });
+
+		if (bubble){ 
+			// Bring this bubble to life
+			bubble.visible = true;
+
+			// Extract the size of the viewport
+			let paddedViewportSize = this.viewport.getHalfSize().scaled(2).add(this.worldPadding);
+			let viewportSize = this.viewport.getHalfSize().scaled(2);
+
+			bubble.position.copy(RandUtils.randVec(paddedViewportSize.x, paddedViewportSize.x, paddedViewportSize.y - viewportSize.y, viewportSize.y));
+
+			bubble.setAIActive(true, {});
+			// Start the bubble spawn timer - spawn a bubble every half a second I think
+			this.mineSpawnTimer.start(100);
+
+		}
 	}
 	/**
 	 * This function takes in a GameNode that may be out of bounds of the viewport and
@@ -736,7 +774,14 @@ export default class HW2Scene extends Scene {
 	 */
 	public handleBubblePlayerCollisions(): number {
 		// TODO check for collisions between the player and the bubbles
-        return;
+		let collisions = 0;
+		for (let bubble of this.bubbles) {
+			if (bubble.visible && this.player.collisionShape.overlaps(bubble.collisionShape)) {
+				this.emitter.fireEvent(HW2Events.BUBBLE_COLLISION, {id: bubble.id});
+				collisions += 1;
+			}
+		}
+        return collisions;
 	}
 
 	/**
@@ -746,7 +791,7 @@ export default class HW2Scene extends Scene {
 	 * 
 	 * @remarks 
 	 * 
-	 * The collision type is an AABB to AABB collision. Collisions between the player and the mines 
+	 * The collision type is an AABB to AAwBB collision. Collisions between the player and the mines 
 	 * need to be checked each frame.
 	 * 
 	 * If a collision is detected between the player and a mine, the player should be notified

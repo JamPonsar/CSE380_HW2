@@ -3,6 +3,8 @@ import Vec2 from "../../Wolfie2D/DataTypes/Vec2";
 import GameEvent from "../../Wolfie2D/Events/GameEvent";
 import Graphic from "../../Wolfie2D/Nodes/Graphic";
 import MathUtils from "../../Wolfie2D/Utils/MathUtils";
+import Receiver from "../../Wolfie2D/Events/Receiver";
+import { HW2Events } from "../HW2Events";
 
 /**
  * A class that represents the behavior of the bubbles in the HW2Scene
@@ -28,8 +30,13 @@ export default class BubbleBehavior implements AI {
     private minYSpeed: number;
     private maxYSpeed: number;
 
+    private receiver: Receiver;
+
     public initializeAI(owner: Graphic, options: Record<string, any>): void {
         this.owner = owner;
+
+        this.receiver = new Receiver();
+        this.receiver.subscribe(HW2Events.BUBBLE_COLLISION);
 
         this.currentXSpeed = 50;
         this.xSpeedIncrement = 0;
@@ -52,6 +59,11 @@ export default class BubbleBehavior implements AI {
 
     public handleEvent(event: GameEvent): void {
         switch(event.type) {
+            case HW2Events.BUBBLE_COLLISION: {
+                this.handleBubbleCollision(event);
+                break;
+            }
+
             default: {
                 throw new Error("Unhandled event caught in BubbleBehavior! Event type: " + event.type);
             }
@@ -73,6 +85,11 @@ export default class BubbleBehavior implements AI {
         }
     }
     
+    protected handleBubbleCollision(event: GameEvent): void {
+        let id = event.data.get("id");
+        this.owner.visible = false;
+    
+    }
 }
 
 

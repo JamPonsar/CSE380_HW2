@@ -28,10 +28,12 @@ export default class PlayerController implements AI {
     private currentHealth: number;
     private maxHealth: number;
     private minHealth: number;
+	private previousHealth: number;
 
     private currentAir: number;
     private maxAir: number;
     private minAir: number;
+	private previousAir: number;
 
     private currentSpeed: number;
 
@@ -45,6 +47,8 @@ export default class PlayerController implements AI {
 	// A receiver and emitter to hook into the event queue
 	private receiver: Receiver;
 	private emitter: Emitter;
+
+	private previousTimeCol: number;
 
 	/**
 	 * This method initializes all variables inside of this AI class.
@@ -61,6 +65,11 @@ export default class PlayerController implements AI {
 		this.laserTimer = new Timer(2500, this.handleLaserTimerEnd, false);
 		
 		this.receiver.subscribe(HW2Events.SHOOT_LASER);
+		this.receiver.subscribe(HW2Events.IDLE);
+		this.receiver.subscribe(HW2Events.DEAD);
+		this.receiver.subscribe(HW2Events.PLAYER_MINE_COLLISION);
+		this.receiver.subscribe(HW2Events.DAMAGE);
+		this.receiver.subscribe(HW2Events.BUBBLE_COLLISION);
 
 		this.activate(options);
 	}
@@ -72,8 +81,9 @@ export default class PlayerController implements AI {
         this.minHealth = 0;
         this.maxHealth = 10;
 
-        // Set the player's current air
+        // Set the player's current and previous air
         this.currentAir = 20;
+		this.previousAir = 20;
 
         // Set upper and lower bounds on the player's air
         this.minAir = 0;
@@ -85,6 +95,8 @@ export default class PlayerController implements AI {
 
         // Set the player's movement speed
         this.currentSpeed = 300
+
+		this.previousTimeCol = Date.now();
 
         // Play the idle animation by default
 		this.owner.animation.play(PlayerAnimations.IDLE);
@@ -116,9 +128,20 @@ export default class PlayerController implements AI {
 
         // If the player is out of hp - play the death animation
 		if (this.currentHealth <= this.minHealth) { 
+			//this.emitter.fireEvent(HW2Events.DAMAGE, {currentHealth: this.currentHealth, maxHealth: this.maxHealth});
             this.emitter.fireEvent(HW2Events.DEAD);
             return;
         }
+
+		if (this.currentHealth != this.previousHealth) {
+			this.emitter.fireEvent(HW2Events.DAMAGE, {currentHealth: this.currentHealth, maxHealth: this.maxHealth});
+			this.previousHealth = this.currentHealth;
+		}
+
+		if (this.currentAir != this.previousAir) {
+			this.emitter.fireEvent(HW2Events.LOSE_AIR, {currentAir: this.currentAir, maxAir: this.maxAir});
+			this.previousAir = this.currentAir;
+		}
 
 		// Get the player's input direction 
 		let forwardAxis = (Input.isPressed(HW2Controls.MOVE_UP) ? 1 : 0) + (Input.isPressed(HW2Controls.MOVE_DOWN) ? -1 : 0);
@@ -155,6 +178,27 @@ export default class PlayerController implements AI {
 				this.handleShootLaserEvent(event);
 				break;
 			}
+			case HW2Events.IDLE: {
+				this.owner.animation.playIfNotAlready(PlayerAnimations.IDLE);
+				break;
+			}
+			case HW2Events.DEAD: {
+				this.handleDeadEvent(event);
+				break;
+			}
+			case HW2Events.DAMAGE: {
+				this.handleDamageEvent(event);
+				break;
+			}
+			case HW2Events.PLAYER_MINE_COLLISION: {
+				this.handlePlayerMineCollisionEvent(event);
+				break;
+			}
+			case HW2Events.BUBBLE_COLLISION: {
+				this.handleBubbleCollisionEvent(event);
+				break;
+			}
+
 			default: {
 				throw new Error(`Unhandled event of type: ${event.type} caught in PlayerController`);
 			}
@@ -192,7 +236,42 @@ export default class PlayerController implements AI {
 		}
 	}
 
+	/**
+	 * This function handles when the player is dead
+	 * @param event 
+	 */
+	protected handleDeadEvent(event: GameEvent): void {
+		this.owner.animation.play(PlayerAnimations.DEATH);
+	}
+
+	/**
+	 * This function handles when the player gets takes damage
+	 * @param event 
+	 */
+	protected handleDamageEvent(event: GameEvent): void {
+		this.owner.animation.play(PlayerAnimations.HIT, false, HW2Events.IDLE);
+	}
+
+	/**
+	 * This function handles when the player collides with the mines
+	 * @param event 
+	 */
+	protected handlePlayerMineCollisionEvent(event: GameEvent): void {
+		//if ((Date.now() - this.previousTimeCol) > 1500) {
+			this.currentHealth--;
+		//	this.previousTimeCol = Date.now();
+		//}
+	}
+
+	/**
+	 * 
+	 * @param event 
+	 */
+	protected handleBubbleCollisionEvent(event: GameEvent): void {
+		this.currentAir++;
+	}
 } 
 
+//"C:\Users\phunt\CSE380_HW2"
 
 
